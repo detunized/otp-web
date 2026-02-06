@@ -12,8 +12,6 @@ A single-page TOTP code viewer. Import your authenticator export, view live code
 - Persistent storage via localStorage
 - Deterministic color-coded icons per service
 
-## Demo
-
 **https://1otp.netlify.app/**
 
 ## Usage
