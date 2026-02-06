@@ -486,6 +486,26 @@
         .filter-wrap.has-text .filter-clear {
             display: flex;
         }
+
+        .qr-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .qr-container img {
+            image-rendering: pixelated;
+        }
+
+        .qr-uri {
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #666;
+            word-break: break-all;
+            text-align: center;
+            max-width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -564,6 +584,16 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="qrModal">
+    <div class="modal">
+        <h2 id="qrModalTitle">QR Code</h2>
+        <div class="qr-container" id="qrContainer"></div>
+        <div class="modal-actions" style="margin-top: 1rem">
+            <button class="modal-btn cancel" id="qrCloseBtn">Close</button>
+        </div>
+    </div>
+</div>
+
 <div class="modal-overlay" id="eraseAllModal">
     <div class="modal">
         <h2>Erase everything?</h2>
@@ -575,6 +605,7 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 (function() {
     "use strict";
@@ -779,6 +810,10 @@
     const editSecretInput = document.getElementById("editSecretInput");
     const editCancelBtn = document.getElementById("editCancelBtn");
     const editSaveBtn = document.getElementById("editSaveBtn");
+    const qrModal = document.getElementById("qrModal");
+    const qrModalTitle = document.getElementById("qrModalTitle");
+    const qrContainer = document.getElementById("qrContainer");
+    const qrCloseBtn = document.getElementById("qrCloseBtn");
     const eraseAllModal = document.getElementById("eraseAllModal");
     const eraseAllCancelBtn = document.getElementById("eraseAllCancelBtn");
     const eraseAllConfirmBtn = document.getElementById("eraseAllConfirmBtn");
@@ -915,10 +950,16 @@
                     <div class="service-code" id="code-${idx}">------</div>
                 </div>
                 <div class="card-actions">
+                    <button class="card-action-btn qr-btn" data-idx="${idx}" title="QR Code" style="font-size:0.7rem;font-weight:700">QR</button>
                     <button class="card-action-btn edit-btn" data-idx="${idx}" title="Edit">&#9998;</button>
                     <button class="card-action-btn delete-btn" data-idx="${idx}" title="Delete">&times;</button>
                 </div>
             `;
+
+            card.querySelector(".qr-btn").addEventListener("click", e => {
+                e.stopPropagation();
+                openQrModal(idx);
+            });
 
             card.querySelector(".edit-btn").addEventListener("click", e => {
                 e.stopPropagation();
@@ -1144,6 +1185,50 @@
         jsonInput.value = "";
     });
 
+    // QR modal
+    function buildOtpauthUri(entry) {
+        const { serviceName, accountName } = parseServiceInfo(entry);
+        const otp = entry.otp || {};
+        const label = serviceName
+            ? encodeURIComponent(serviceName) + ":" + encodeURIComponent(accountName)
+            : encodeURIComponent(accountName);
+        const params = new URLSearchParams();
+        params.set("secret", entry.secret);
+        if (serviceName) params.set("issuer", serviceName);
+        if (otp.algorithm) params.set("algorithm", otp.algorithm);
+        if (otp.digits) params.set("digits", String(otp.digits));
+        if (otp.period) params.set("period", String(otp.period));
+        return "otpauth://totp/" + label + "?" + params.toString();
+    }
+
+    function openQrModal(idx) {
+        const entry = services[idx];
+        const { serviceName, accountName } = parseServiceInfo(entry);
+        qrModalTitle.textContent = serviceName + " \u2014 " + accountName;
+        const uri = buildOtpauthUri(entry);
+        qrContainer.innerHTML = "";
+        var qr = qrcode(0, "M");
+        qr.addData(uri);
+        qr.make();
+        var img = document.createElement("img");
+        img.src = qr.createDataURL(6, 0);
+        img.alt = "QR Code";
+        qrContainer.appendChild(img);
+        var uriEl = document.createElement("div");
+        uriEl.className = "qr-uri";
+        uriEl.textContent = uri;
+        qrContainer.appendChild(uriEl);
+        qrModal.classList.add("active");
+    }
+
+    qrCloseBtn.addEventListener("click", () => {
+        qrModal.classList.remove("active");
+    });
+
+    qrModal.addEventListener("click", e => {
+        if (e.target === qrModal) qrModal.classList.remove("active");
+    });
+
     // Add new entry
     addBtn.addEventListener("click", () => {
         pendingEditIndex = -2;
@@ -1168,7 +1253,8 @@
     function isModalOpen() {
         return deleteModal.classList.contains("active")
             || editModal.classList.contains("active")
-            || eraseAllModal.classList.contains("active");
+            || eraseAllModal.classList.contains("active")
+            || qrModal.classList.contains("active");
     }
 
     document.addEventListener("keydown", e => {
