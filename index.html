@@ -626,20 +626,29 @@
         return { serviceName, accountName };
     }
 
-    // Map icon background color to CSS class
-    function iconColorClass(color) {
-        if (!color) return "icon-default";
-        const map = {
-            green: "icon-green",
-            yellow: "icon-yellow",
-            red: "icon-red",
-            orange: "icon-orange",
-            pink: "icon-pink",
-            indigo: "icon-indigo",
-            turquoise: "icon-turquoise",
-            lightblue: "icon-lightblue",
-        };
-        return map[color.toLowerCase()] || "icon-default";
+    var ICON_COLORS = [
+        "icon-green", "icon-yellow", "icon-red", "icon-orange",
+        "icon-pink", "icon-indigo", "icon-turquoise", "icon-lightblue",
+        "icon-default"
+    ];
+
+    function serviceIconColor(serviceName) {
+        var key = serviceName.toLowerCase().trim();
+        var hash = 0;
+        for (var i = 0; i < key.length; i++) {
+            hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
+        }
+        return ICON_COLORS[Math.abs(hash) % ICON_COLORS.length];
+    }
+
+    function serviceIconText(serviceName) {
+        var name = serviceName.trim();
+        if (!name) return "??";
+        var words = name.split(/[\s\-_.]+/).filter(Boolean);
+        if (words.length >= 2) {
+            return (words[0][0] + words[1][0]).toUpperCase();
+        }
+        return name.slice(0, 2).toUpperCase();
     }
 
     // Parse and validate input JSON
@@ -814,9 +823,8 @@
         sortedIndices.forEach(idx => {
             const entry = services[idx];
             const { serviceName, accountName } = parseServiceInfo(entry);
-            const iconLabel = entry.icon?.label;
-            const iconText = iconLabel?.text || serviceName.slice(0, 2).toUpperCase();
-            const colorClass = iconColorClass(iconLabel?.backgroundColor);
+            const iconText = serviceIconText(serviceName);
+            const colorClass = serviceIconColor(serviceName);
 
             const card = document.createElement("div");
             card.className = "service-card";
@@ -980,12 +988,6 @@
                     digits: 6,
                     counter: 0,
                     tokenType: "TOTP"
-                },
-                icon: {
-                    label: {
-                        backgroundColor: "default",
-                        text: (newService || "??").slice(0, 2).toUpperCase()
-                    }
                 }
             });
             saveToStorage();
