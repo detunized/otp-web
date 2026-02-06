@@ -429,6 +429,58 @@
             color: #888;
             margin-bottom: 0.3rem;
         }
+
+        .filter-wrap {
+            position: relative;
+            margin-bottom: 0.7rem;
+        }
+
+        .filter-input {
+            width: 100%;
+            padding: 0.5rem 2rem 0.5rem 0.8rem;
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #e0e0e0;
+            font-size: 0.9rem;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: #6c63ff;
+        }
+
+        .filter-input::placeholder {
+            color: #555;
+        }
+
+        .filter-clear {
+            position: absolute;
+            right: 0.4rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 50%;
+            background: transparent;
+            color: #555;
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .filter-clear:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #aaa;
+        }
+
+        .filter-wrap.has-text .filter-clear {
+            display: flex;
+        }
     </style>
 </head>
 <body>
@@ -467,6 +519,10 @@
             <button class="toolbar-btn" data-sort="service">Service</button>
             <button class="toolbar-btn" data-sort="account">Account</button>
         </div>
+    </div>
+    <div class="filter-wrap" id="filterWrap">
+        <input type="text" class="filter-input" id="filterInput" placeholder="Filter..." spellcheck="false" autocomplete="off">
+        <button class="filter-clear" id="filterClear">&times;</button>
     </div>
     <div class="timer-bar-container">
         <div class="timer-bar" id="timerBar"></div>
@@ -686,6 +742,7 @@
     let pendingDeleteIndex = -1;
     let pendingEditIndex = -1; // -1 = none, -2 = adding new
     let currentSort = "original";
+    let filterText = "";
 
     // DOM
     const importView = document.getElementById("importView");
@@ -700,6 +757,9 @@
     const resetBtn = document.getElementById("resetBtn");
     const addBtn = document.getElementById("addBtn");
     const eraseAllBtn = document.getElementById("eraseAllBtn");
+    const filterInput = document.getElementById("filterInput");
+    const filterWrap = document.getElementById("filterWrap");
+    const filterClear = document.getElementById("filterClear");
     const copiedToast = document.getElementById("copiedToast");
     const deleteModal = document.getElementById("deleteModal");
     const deleteModalText = document.getElementById("deleteModalText");
@@ -800,7 +860,14 @@
     }
 
     function getSortedIndices() {
-        const indices = services.map((_, i) => i);
+        let indices = services.map((_, i) => i);
+        if (filterText) {
+            const q = filterText.toLowerCase();
+            indices = indices.filter(i => {
+                const { serviceName, accountName } = parseServiceInfo(services[i]);
+                return serviceName.toLowerCase().includes(q) || accountName.toLowerCase().includes(q);
+            });
+        }
         if (currentSort === "service") {
             indices.sort((a, b) => {
                 const sa = parseServiceInfo(services[a]).serviceName.toLowerCase();
@@ -1015,6 +1082,23 @@
             if (e.key === "Escape") closeEditModal();
         });
     }
+
+    // Filter
+    filterInput.addEventListener("input", () => {
+        filterText = filterInput.value;
+        filterWrap.classList.toggle("has-text", filterText.length > 0);
+        renderServiceList();
+        updateAllCodes();
+    });
+
+    filterClear.addEventListener("click", () => {
+        filterInput.value = "";
+        filterText = "";
+        filterWrap.classList.remove("has-text");
+        renderServiceList();
+        updateAllCodes();
+        filterInput.focus();
+    });
 
     // Sort buttons
     sortButtons.forEach(btn => {
