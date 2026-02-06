@@ -123,8 +123,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 1rem 0;
-            margin-bottom: 0.5rem;
+            padding: 1rem 0 0.5rem;
         }
 
         .codes-header h1 {
@@ -132,20 +131,56 @@
             color: #fff;
         }
 
-        .reset-btn {
-            padding: 0.4rem 1rem;
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding-bottom: 0.7rem;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-btn {
+            padding: 0.4rem 0.8rem;
             background: transparent;
             color: #888;
             border: 1px solid #444;
             border-radius: 6px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             cursor: pointer;
-            transition: border-color 0.2s, color 0.2s;
+            transition: border-color 0.2s, color 0.2s, background 0.2s;
+            white-space: nowrap;
         }
 
-        .reset-btn:hover {
+        .toolbar-btn:hover {
             border-color: #888;
             color: #e0e0e0;
+        }
+
+        .toolbar-btn.danger-outline:hover {
+            border-color: #c0392b;
+            color: #ff6b6b;
+        }
+
+        .toolbar-btn.active {
+            background: #6c63ff;
+            border-color: #6c63ff;
+            color: #fff;
+        }
+
+        .toolbar-spacer {
+            flex: 1;
+        }
+
+        .sort-group {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .sort-label {
+            font-size: 0.75rem;
+            color: #666;
+            margin-right: 0.2rem;
         }
 
         .timer-bar-container {
@@ -420,7 +455,18 @@
 <div class="codes-view" id="codesView">
     <div class="codes-header">
         <h1>OTP Codes</h1>
-        <button class="reset-btn" id="resetBtn">Import New</button>
+    </div>
+    <div class="toolbar">
+        <button class="toolbar-btn" id="addBtn">+ Add</button>
+        <button class="toolbar-btn" id="resetBtn">Import</button>
+        <button class="toolbar-btn danger-outline" id="eraseAllBtn">Erase All</button>
+        <div class="toolbar-spacer"></div>
+        <div class="sort-group">
+            <span class="sort-label">Sort:</span>
+            <button class="toolbar-btn active" data-sort="original">Original</button>
+            <button class="toolbar-btn" data-sort="service">Service</button>
+            <button class="toolbar-btn" data-sort="account">Account</button>
+        </div>
     </div>
     <div class="timer-bar-container">
         <div class="timer-bar" id="timerBar"></div>
@@ -453,6 +499,17 @@
         <div class="modal-actions">
             <button class="modal-btn cancel" id="editCancelBtn">Cancel</button>
             <button class="modal-btn primary" id="editSaveBtn">Save</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="eraseAllModal">
+    <div class="modal">
+        <h2>Erase everything?</h2>
+        <p>This will permanently delete all entries and cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="modal-btn cancel" id="eraseAllCancelBtn">Cancel</button>
+            <button class="modal-btn danger" id="eraseAllConfirmBtn">Erase All</button>
         </div>
     </div>
 </div>
@@ -618,7 +675,8 @@
     let services = [];
     let updateTimer = null;
     let pendingDeleteIndex = -1;
-    let pendingEditIndex = -1;
+    let pendingEditIndex = -1; // -1 = none, -2 = adding new
+    let currentSort = "original";
 
     // DOM
     const importView = document.getElementById("importView");
@@ -631,17 +689,24 @@
     const serviceList = document.getElementById("serviceList");
     const timerBar = document.getElementById("timerBar");
     const resetBtn = document.getElementById("resetBtn");
+    const addBtn = document.getElementById("addBtn");
+    const eraseAllBtn = document.getElementById("eraseAllBtn");
     const copiedToast = document.getElementById("copiedToast");
     const deleteModal = document.getElementById("deleteModal");
     const deleteModalText = document.getElementById("deleteModalText");
     const deleteCancelBtn = document.getElementById("deleteCancelBtn");
     const deleteConfirmBtn = document.getElementById("deleteConfirmBtn");
     const editModal = document.getElementById("editModal");
+    const editModalTitle = editModal.querySelector("h2");
     const editServiceInput = document.getElementById("editServiceInput");
     const editAccountInput = document.getElementById("editAccountInput");
     const editSecretInput = document.getElementById("editSecretInput");
     const editCancelBtn = document.getElementById("editCancelBtn");
     const editSaveBtn = document.getElementById("editSaveBtn");
+    const eraseAllModal = document.getElementById("eraseAllModal");
+    const eraseAllCancelBtn = document.getElementById("eraseAllCancelBtn");
+    const eraseAllConfirmBtn = document.getElementById("eraseAllConfirmBtn");
+    const sortButtons = document.querySelectorAll("[data-sort]");
 
     // Drop zone events
     dropZone.addEventListener("click", () => fileInput.click());
@@ -725,9 +790,29 @@
         }, 1000);
     }
 
+    function getSortedIndices() {
+        const indices = services.map((_, i) => i);
+        if (currentSort === "service") {
+            indices.sort((a, b) => {
+                const sa = parseServiceInfo(services[a]).serviceName.toLowerCase();
+                const sb = parseServiceInfo(services[b]).serviceName.toLowerCase();
+                return sa.localeCompare(sb);
+            });
+        } else if (currentSort === "account") {
+            indices.sort((a, b) => {
+                const aa = parseServiceInfo(services[a]).accountName.toLowerCase();
+                const ab = parseServiceInfo(services[b]).accountName.toLowerCase();
+                return aa.localeCompare(ab);
+            });
+        }
+        return indices;
+    }
+
     function renderServiceList() {
         serviceList.innerHTML = "";
-        services.forEach((entry, idx) => {
+        const sortedIndices = getSortedIndices();
+        sortedIndices.forEach(idx => {
+            const entry = services[idx];
             const { serviceName, accountName } = parseServiceInfo(entry);
             const iconLabel = entry.icon?.label;
             const iconText = iconLabel?.text || serviceName.slice(0, 2).toUpperCase();
@@ -746,7 +831,7 @@
                     <div class="service-code" id="code-${idx}">------</div>
                 </div>
                 <div class="card-actions">
-                    <button class="card-action-btn edit-btn" data-idx="${idx}" title="Edit secret">&#9998;</button>
+                    <button class="card-action-btn edit-btn" data-idx="${idx}" title="Edit">&#9998;</button>
                     <button class="card-action-btn delete-btn" data-idx="${idx}" title="Delete">&times;</button>
                 </div>
             `;
@@ -854,6 +939,7 @@
     // Edit modal
     function openEditModal(idx) {
         pendingEditIndex = idx;
+        editModalTitle.textContent = "Edit entry";
         const { serviceName, accountName } = parseServiceInfo(services[idx]);
         editServiceInput.value = serviceName;
         editAccountInput.value = accountName;
@@ -873,15 +959,41 @@
     });
 
     editSaveBtn.addEventListener("click", () => {
-        if (pendingEditIndex >= 0 && pendingEditIndex < services.length) {
+        const newService = editServiceInput.value.trim();
+        const newAccount = editAccountInput.value.trim();
+        const newSecret = editSecretInput.value.trim().toUpperCase().replace(/\s/g, "");
+        if (!newSecret) {
+            showToast("Secret cannot be empty");
+            return;
+        }
+
+        if (pendingEditIndex === -2) {
+            // Adding new entry
+            services.push({
+                name: newAccount,
+                secret: newSecret,
+                otp: {
+                    issuer: newService,
+                    account: newAccount,
+                    algorithm: "SHA1",
+                    period: 30,
+                    digits: 6,
+                    counter: 0,
+                    tokenType: "TOTP"
+                },
+                icon: {
+                    label: {
+                        backgroundColor: "default",
+                        text: (newService || "??").slice(0, 2).toUpperCase()
+                    }
+                }
+            });
+            saveToStorage();
+            renderServiceList();
+            updateAllCodes();
+            showToast("Entry added");
+        } else if (pendingEditIndex >= 0 && pendingEditIndex < services.length) {
             const entry = services[pendingEditIndex];
-            const newService = editServiceInput.value.trim();
-            const newAccount = editAccountInput.value.trim();
-            const newSecret = editSecretInput.value.trim().toUpperCase().replace(/\s/g, "");
-            if (!newSecret) {
-                showToast("Secret cannot be empty");
-                return;
-            }
             if (!entry.otp) entry.otp = {};
             entry.otp.issuer = newService;
             entry.otp.account = newAccount;
@@ -901,6 +1013,52 @@
             if (e.key === "Escape") closeEditModal();
         });
     }
+
+    // Sort buttons
+    sortButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            currentSort = btn.dataset.sort;
+            sortButtons.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            renderServiceList();
+            updateAllCodes();
+        });
+    });
+
+    // Erase all
+    eraseAllBtn.addEventListener("click", () => {
+        eraseAllModal.classList.add("active");
+    });
+
+    eraseAllCancelBtn.addEventListener("click", () => {
+        eraseAllModal.classList.remove("active");
+    });
+
+    eraseAllModal.addEventListener("click", e => {
+        if (e.target === eraseAllModal) eraseAllModal.classList.remove("active");
+    });
+
+    eraseAllConfirmBtn.addEventListener("click", () => {
+        services = [];
+        clearStorage();
+        eraseAllModal.classList.remove("active");
+        if (updateTimer) clearInterval(updateTimer);
+        codesView.style.display = "none";
+        importView.style.display = "flex";
+        serviceList.innerHTML = "";
+        jsonInput.value = "";
+    });
+
+    // Add new entry
+    addBtn.addEventListener("click", () => {
+        pendingEditIndex = -2;
+        editModalTitle.textContent = "Add entry";
+        editServiceInput.value = "";
+        editAccountInput.value = "";
+        editSecretInput.value = "";
+        editModal.classList.add("active");
+        setTimeout(() => editServiceInput.focus(), 50);
+    });
 })();
 </script>
 
