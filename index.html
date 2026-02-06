@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        .import-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .import-view h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+
+        .import-view p {
+            color: #888;
+            margin-bottom: 2rem;
+        }
+
+        .drop-zone {
+            width: 100%;
+            max-width: 600px;
+            border: 2px dashed #444;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .drop-zone.drag-over {
+            border-color: #6c63ff;
+            background: rgba(108, 99, 255, 0.1);
+        }
+
+        .drop-zone-text {
+            font-size: 1.1rem;
+            color: #888;
+            margin-bottom: 1rem;
+        }
+
+        .drop-zone-or {
+            color: #555;
+            margin: 1rem 0;
+        }
+
+        .paste-area {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 1rem;
+        }
+
+        .paste-area textarea {
+            width: 100%;
+            height: 150px;
+            background: #16213e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #e0e0e0;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            resize: vertical;
+        }
+
+        .paste-area textarea:focus {
+            outline: none;
+            border-color: #6c63ff;
+        }
+
+        .load-btn {
+            margin-top: 1rem;
+            padding: 0.7rem 2rem;
+            background: #6c63ff;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .load-btn:hover {
+            background: #5a52d5;
+        }
+
+        .error-msg {
+            color: #ff6b6b;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+
+        /* Codes view */
+        .codes-view {
+            display: none;
+            padding: 1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .codes-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 0;
+            margin-bottom: 0.5rem;
+        }
+
+        .codes-header h1 {
+            font-size: 1.4rem;
+            color: #fff;
+        }
+
+        .reset-btn {
+            padding: 0.4rem 1rem;
+            background: transparent;
+            color: #888;
+            border: 1px solid #444;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+
+        .reset-btn:hover {
+            border-color: #888;
+            color: #e0e0e0;
+        }
+
+        .timer-bar-container {
+            width: 100%;
+            height: 3px;
+            background: #333;
+            border-radius: 2px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+
+        .timer-bar {
+            height: 100%;
+            background: #6c63ff;
+            border-radius: 2px;
+            transition: width 1s linear;
+        }
+
+        .service-card {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 1rem 1.2rem;
+            margin-bottom: 0.6rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+            transition: background 0.15s;
+            position: relative;
+        }
+
+        .service-card:hover {
+            background: #1a2745;
+        }
+
+        .service-card:active {
+            background: #1e2d50;
+        }
+
+        .service-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .service-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .service-name {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 0.15rem;
+        }
+
+        .service-account {
+            font-size: 0.85rem;
+            color: #ccc;
+            word-break: break-all;
+        }
+
+        .service-code-area {
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .service-code {
+            font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fff;
+            letter-spacing: 0.15em;
+        }
+
+        .service-countdown {
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 0.1rem;
+        }
+
+        .copied-toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #333;
+            color: #fff;
+            padding: 0.6rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .copied-toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .icon-green { background: #2d8a4e; }
+        .icon-yellow { background: #b8860b; }
+        .icon-red { background: #c0392b; }
+        .icon-orange { background: #d35400; }
+        .icon-pink { background: #c0457b; }
+        .icon-indigo { background: #5c6bc0; }
+        .icon-turquoise { background: #1abc9c; }
+        .icon-lightblue { background: #2980b9; }
+        .icon-default { background: #6c63ff; }
+    </style>
+</head>
+<body>
+
+<div class="import-view" id="importView">
+    <h1>OTP Viewer</h1>
+    <p>Import your authenticator export to view TOTP codes</p>
+
+    <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-text">Drop a JSON file here</div>
+        <input type="file" id="fileInput" accept=".json,.txt" style="display: none">
+    </div>
+
+    <div class="drop-zone-or">or paste JSON below</div>
+
+    <div class="paste-area">
+        <textarea id="jsonInput" placeholder='Paste your authenticator export JSON here...'></textarea>
+        <button class="load-btn" id="loadBtn">Load</button>
+    </div>
+
+    <div class="error-msg" id="errorMsg"></div>
+</div>
+
+<div class="codes-view" id="codesView">
+    <div class="codes-header">
+        <h1>OTP Codes</h1>
+        <button class="reset-btn" id="resetBtn">Import New</button>
+    </div>
+    <div class="timer-bar-container">
+        <div class="timer-bar" id="timerBar"></div>
+    </div>
+    <div id="serviceList"></div>
+</div>
+
+<div class="copied-toast" id="copiedToast">Code copied</div>
+
+<script>
+(function() {
+    "use strict";
+
+    // Base32 decode
+    function base32Decode(input) {
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        input = input.toUpperCase().replace(/[^A-Z2-7]/g, "");
+        const output = [];
+        let buffer = 0;
+        let bitsLeft = 0;
+        for (const ch of input) {
+            const val = alphabet.indexOf(ch);
+            if (val === -1) continue;
+            buffer = (buffer << 5) | val;
+            bitsLeft += 5;
+            if (bitsLeft >= 8) {
+                bitsLeft -= 8;
+                output.push((buffer >> bitsLeft) & 0xff);
+            }
+        }
+        return new Uint8Array(output);
+    }
+
+    // HMAC-SHA1 using Web Crypto
+    async function hmacSha1(keyBytes, message) {
+        const key = await crypto.subtle.importKey(
+            "raw", keyBytes, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
+        );
+        const sig = await crypto.subtle.sign("HMAC", key, message);
+        return new Uint8Array(sig);
+    }
+
+    // Generate TOTP code
+    async function generateTOTP(secret, period, digits) {
+        period = period || 30;
+        digits = digits || 6;
+
+        const keyBytes = base32Decode(secret);
+        const epoch = Math.floor(Date.now() / 1000);
+        const counter = Math.floor(epoch / period);
+
+        const counterBytes = new Uint8Array(8);
+        let tmp = counter;
+        for (let i = 7; i >= 0; i--) {
+            counterBytes[i] = tmp & 0xff;
+            tmp = Math.floor(tmp / 256);
+        }
+
+        const hash = await hmacSha1(keyBytes, counterBytes);
+        const offset = hash[hash.length - 1] & 0x0f;
+        const binary =
+            ((hash[offset] & 0x7f) << 24) |
+            ((hash[offset + 1] & 0xff) << 16) |
+            ((hash[offset + 2] & 0xff) << 8) |
+            (hash[offset + 3] & 0xff);
+
+        const otp = binary % Math.pow(10, digits);
+        return otp.toString().padStart(digits, "0");
+    }
+
+    // Format code with a space in the middle (e.g. "123 456")
+    function formatCode(code) {
+        if (code.length === 6) return code.slice(0, 3) + " " + code.slice(3);
+        if (code.length === 8) return code.slice(0, 4) + " " + code.slice(4);
+        return code;
+    }
+
+    // Extract service name and account from entry
+    function parseServiceInfo(entry) {
+        const issuer = entry.otp && entry.otp.issuer;
+        const account = entry.otp && entry.otp.account;
+        const name = entry.name || "";
+
+        let serviceName = issuer || "";
+        let accountName = account || "";
+
+        if (!serviceName && name) {
+            // Try to extract from "Service - Service:account" format
+            const dashParts = name.split(" - ");
+            if (dashParts.length >= 2) {
+                serviceName = dashParts[0].trim();
+                const rest = dashParts.slice(1).join(" - ");
+                const colonIdx = rest.indexOf(":");
+                if (colonIdx !== -1) {
+                    accountName = rest.slice(colonIdx + 1).trim();
+                } else {
+                    accountName = rest.trim();
+                }
+            } else {
+                // Could be an email or domain
+                serviceName = name;
+            }
+        }
+
+        if (!accountName && name && serviceName !== name) {
+            accountName = name;
+        }
+
+        if (!accountName) {
+            accountName = name;
+        }
+
+        // If serviceName equals accountName, and account looks like an email/identifier,
+        // leave serviceName and show account
+        if (serviceName === accountName && issuer) {
+            serviceName = issuer;
+        }
+
+        return { serviceName, accountName };
+    }
+
+    // Map icon background color to CSS class
+    function iconColorClass(color) {
+        if (!color) return "icon-default";
+        const map = {
+            green: "icon-green",
+            yellow: "icon-yellow",
+            red: "icon-red",
+            orange: "icon-orange",
+            pink: "icon-pink",
+            indigo: "icon-indigo",
+            turquoise: "icon-turquoise",
+            lightblue: "icon-lightblue",
+        };
+        return map[color.toLowerCase()] || "icon-default";
+    }
+
+    // Parse and validate input JSON
+    function parseConfig(text) {
+        const data = JSON.parse(text);
+        if (!data.services || !Array.isArray(data.services)) {
+            throw new Error("Invalid format: missing 'services' array");
+        }
+        return data.services
+            .filter(s => s.secret && s.otp && s.otp.tokenType === "TOTP")
+            .sort((a, b) => (a.order?.position || 0) - (b.order?.position || 0));
+    }
+
+    // State
+    let services = [];
+    let updateTimer = null;
+
+    // DOM
+    const importView = document.getElementById("importView");
+    const codesView = document.getElementById("codesView");
+    const dropZone = document.getElementById("dropZone");
+    const fileInput = document.getElementById("fileInput");
+    const jsonInput = document.getElementById("jsonInput");
+    const loadBtn = document.getElementById("loadBtn");
+    const errorMsg = document.getElementById("errorMsg");
+    const serviceList = document.getElementById("serviceList");
+    const timerBar = document.getElementById("timerBar");
+    const resetBtn = document.getElementById("resetBtn");
+    const copiedToast = document.getElementById("copiedToast");
+
+    // Drop zone events
+    dropZone.addEventListener("click", () => fileInput.click());
+
+    dropZone.addEventListener("dragover", e => {
+        e.preventDefault();
+        dropZone.classList.add("drag-over");
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("drag-over");
+    });
+
+    dropZone.addEventListener("drop", e => {
+        e.preventDefault();
+        dropZone.classList.remove("drag-over");
+        const file = e.dataTransfer.files[0];
+        if (file) readFile(file);
+    });
+
+    fileInput.addEventListener("change", () => {
+        if (fileInput.files[0]) readFile(fileInput.files[0]);
+    });
+
+    function readFile(file) {
+        const reader = new FileReader();
+        reader.onload = () => loadConfig(reader.result);
+        reader.readAsText(file);
+    }
+
+    loadBtn.addEventListener("click", () => {
+        if (jsonInput.value.trim()) loadConfig(jsonInput.value.trim());
+    });
+
+    resetBtn.addEventListener("click", () => {
+        services = [];
+        if (updateTimer) clearInterval(updateTimer);
+        codesView.style.display = "none";
+        importView.style.display = "flex";
+        serviceList.innerHTML = "";
+        jsonInput.value = "";
+        errorMsg.textContent = "";
+    });
+
+    function loadConfig(text) {
+        try {
+            services = parseConfig(text);
+            if (services.length === 0) {
+                errorMsg.textContent = "No valid TOTP services found in the data.";
+                return;
+            }
+            errorMsg.textContent = "";
+            showCodes();
+        } catch (e) {
+            errorMsg.textContent = "Error: " + e.message;
+        }
+    }
+
+    function showCodes() {
+        importView.style.display = "none";
+        codesView.style.display = "block";
+        renderServiceList();
+        updateAllCodes();
+        updateTimerBar();
+
+        if (updateTimer) clearInterval(updateTimer);
+        updateTimer = setInterval(() => {
+            updateAllCodes();
+            updateTimerBar();
+        }, 1000);
+    }
+
+    function renderServiceList() {
+        serviceList.innerHTML = "";
+        services.forEach((entry, idx) => {
+            const { serviceName, accountName } = parseServiceInfo(entry);
+            const iconLabel = entry.icon?.label;
+            const iconText = iconLabel?.text || serviceName.slice(0, 2).toUpperCase();
+            const colorClass = iconColorClass(iconLabel?.backgroundColor);
+
+            const card = document.createElement("div");
+            card.className = "service-card";
+            card.dataset.index = idx;
+            card.innerHTML = `
+                <div class="service-icon ${colorClass}">${iconText}</div>
+                <div class="service-info">
+                    <div class="service-name">${escapeHtml(serviceName)}</div>
+                    <div class="service-account">${escapeHtml(accountName)}</div>
+                </div>
+                <div class="service-code-area">
+                    <div class="service-code" id="code-${idx}">------</div>
+                    <div class="service-countdown" id="countdown-${idx}"></div>
+                </div>
+            `;
+
+            card.addEventListener("click", async () => {
+                const codeEl = document.getElementById(`code-${idx}`);
+                const rawCode = codeEl.textContent.replace(/\s/g, "");
+                try {
+                    await navigator.clipboard.writeText(rawCode);
+                    showToast("Code copied");
+                } catch {
+                    showToast("Copy failed");
+                }
+            });
+
+            serviceList.appendChild(card);
+        });
+    }
+
+    async function updateAllCodes() {
+        const now = Math.floor(Date.now() / 1000);
+        for (let i = 0; i < services.length; i++) {
+            const entry = services[i];
+            const period = entry.otp.period || 30;
+            const remaining = period - (now % period);
+
+            try {
+                const code = await generateTOTP(entry.secret, period, entry.otp.digits || 6);
+                const codeEl = document.getElementById(`code-${i}`);
+                if (codeEl) codeEl.textContent = formatCode(code);
+            } catch {
+                const codeEl = document.getElementById(`code-${i}`);
+                if (codeEl) codeEl.textContent = "ERROR";
+            }
+
+            const cdEl = document.getElementById(`countdown-${i}`);
+            if (cdEl) cdEl.textContent = remaining + "s";
+        }
+    }
+
+    function updateTimerBar() {
+        const now = Math.floor(Date.now() / 1000);
+        const remaining = 30 - (now % 30);
+        const pct = (remaining / 30) * 100;
+        timerBar.style.width = pct + "%";
+    }
+
+    function escapeHtml(str) {
+        const el = document.createElement("span");
+        el.textContent = str;
+        return el.innerHTML;
+    }
+
+    let toastTimeout;
+    function showToast(msg) {
+        copiedToast.textContent = msg;
+        copiedToast.classList.add("show");
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => copiedToast.classList.remove("show"), 1500);
+    }
+})();
+</script>
+
+</body>
+</html>
