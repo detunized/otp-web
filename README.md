@@ -2,6 +2,8 @@
 
 A single-page TOTP code viewer. Import your authenticator export, view live codes, copy with a click. No backend, no dependencies, runs entirely in the browser.
 
+**https://1otp.netlify.app/**
+
 ## Features
 
 - Import OTP config via file drop or paste (JSON format)
@@ -11,8 +13,6 @@ A single-page TOTP code viewer. Import your authenticator export, view live code
 - Sort by original order, service name, or account
 - Persistent storage via localStorage
 - Deterministic color-coded icons per service
-
-**https://1otp.netlify.app/**
 
 ## Usage
 
