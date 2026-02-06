@@ -494,19 +494,6 @@
             padding: 0.5rem 0;
         }
 
-        .qr-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 0.9rem;
-            color: #fff;
-            margin-bottom: 0.5rem;
-        }
-
         .qr-service-name {
             color: #fff;
             font-size: 1rem;
@@ -616,7 +603,6 @@
 <div class="modal-overlay" id="qrModal">
     <div class="modal" style="text-align: center">
         <div class="qr-modal-content">
-            <div class="qr-icon" id="qrIcon"></div>
             <div class="qr-service-name" id="qrServiceName"></div>
             <div class="qr-account-name" id="qrAccountName"></div>
             <div class="qr-image-wrap" id="qrContainer"></div>
@@ -845,7 +831,6 @@
     const editSaveBtn = document.getElementById("editSaveBtn");
     const qrModal = document.getElementById("qrModal");
     const qrContainer = document.getElementById("qrContainer");
-    const qrIcon = document.getElementById("qrIcon");
     const qrServiceName = document.getElementById("qrServiceName");
     const qrAccountName = document.getElementById("qrAccountName");
     const qrCloseBtn = document.getElementById("qrCloseBtn");
@@ -1248,8 +1233,6 @@
         img.src = qr.createDataURL(5, 0);
         img.alt = "QR Code";
         qrContainer.appendChild(img);
-        qrIcon.className = "qr-icon " + serviceIconColor(serviceName);
-        qrIcon.textContent = serviceIconText(serviceName);
         qrServiceName.textContent = serviceName;
         qrAccountName.textContent = accountName;
         qrModal.classList.add("active");
