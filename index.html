@@ -1175,14 +1175,12 @@
         if (codesView.style.display === "none" || isModalOpen()) return;
 
         if (e.key === "Escape") {
-            if (filterInput.value) {
-                filterInput.value = "";
-                filterText = "";
-                filterWrap.classList.remove("has-text");
-                selectedVisible = -1;
-                renderServiceList();
-                updateAllCodes();
-            }
+            filterInput.value = "";
+            filterText = "";
+            filterWrap.classList.remove("has-text");
+            selectedVisible = -1;
+            renderServiceList();
+            updateAllCodes();
             filterInput.blur();
             e.preventDefault();
             return;
