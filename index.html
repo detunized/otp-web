@@ -997,7 +997,7 @@
         // Rebuild visibleIndices (only non-collapsed entries)
         visibleIndices = [];
         groups.forEach(g => {
-            if (!collapsedGroups.has(g.key)) {
+            if (!collapsedGroups.has(g.key) || g.indices.length <= 1) {
                 g.indices.forEach(idx => visibleIndices.push(idx));
             }
         });
@@ -1011,15 +1011,17 @@
             groupEl.style.borderLeftColor = ICON_COLOR_HEX[g.colorClass] || "#6c63ff";
             serviceList.appendChild(groupEl);
 
-            // Clickable gutter area
-            const gutter = document.createElement("div");
-            gutter.className = "group-gutter";
-            gutter.addEventListener("click", () => {
-                toggleGroup(g.key);
-            });
-            groupEl.appendChild(gutter);
+            // Clickable gutter area (only for multi-item groups)
+            if (g.indices.length > 1) {
+                const gutter = document.createElement("div");
+                gutter.className = "group-gutter";
+                gutter.addEventListener("click", () => {
+                    toggleGroup(g.key);
+                });
+                groupEl.appendChild(gutter);
+            }
 
-            if (collapsed) {
+            if (collapsed && g.indices.length > 1) {
                 // Show collapsed header
                 const header = document.createElement("div");
                 header.className = "group-header";
@@ -1089,8 +1091,8 @@
         });
 
         // Update collapse button label
-        var allGroupKeys = groups.map(g => g.key);
-        var allCollapsed = allGroupKeys.length > 0 && allGroupKeys.every(k => collapsedGroups.has(k));
+        var multiGroupKeys = groups.filter(g => g.indices.length > 1).map(g => g.key);
+        var allCollapsed = multiGroupKeys.length > 0 && multiGroupKeys.every(k => collapsedGroups.has(k));
         collapseAllBtn.textContent = allCollapsed ? "Expand All" : "Collapse All";
     }
 
@@ -1266,18 +1268,20 @@
     });
 
 
-    // Collapse all
+    // Collapse all (only multi-item groups)
     collapseAllBtn.addEventListener("click", () => {
         var allIndices = getSortedIndices();
-        var allKeys = new Set();
+        var groupCounts = {};
         allIndices.forEach(idx => {
-            allKeys.add(parseServiceInfo(services[idx]).serviceName.toLowerCase());
+            var k = parseServiceInfo(services[idx]).serviceName.toLowerCase();
+            groupCounts[k] = (groupCounts[k] || 0) + 1;
         });
-        var allCollapsed = allKeys.size > 0 && [...allKeys].every(k => collapsedGroups.has(k));
+        var multiKeys = Object.keys(groupCounts).filter(k => groupCounts[k] > 1);
+        var allCollapsed = multiKeys.length > 0 && multiKeys.every(k => collapsedGroups.has(k));
         if (allCollapsed) {
             collapsedGroups.clear();
         } else {
-            allKeys.forEach(k => collapsedGroups.add(k));
+            multiKeys.forEach(k => collapsedGroups.add(k));
         }
         renderServiceList();
         updateAllCodes();
