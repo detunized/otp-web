@@ -190,8 +190,6 @@
         }
 
         .service-group {
-            border-left: 3px solid #6c63ff;
-            border-radius: 3px 0 0 3px;
             margin-bottom: 0.6rem;
             position: relative;
         }
@@ -200,7 +198,6 @@
             background: #16213e;
             border-radius: 8px;
             padding: 1rem 1.2rem;
-            margin-left: 10px;
             display: flex;
             align-items: center;
             gap: 1rem;
@@ -223,6 +220,16 @@
 
         .service-card.selected {
             background: #1e2d50;
+        }
+
+        .service-card.selected::before {
+            content: "";
+            position: absolute;
+            left: -9px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--gutter-color, #6c63ff);
         }
 
         .service-icon {
@@ -979,9 +986,12 @@
                     const visIdx = visCounter++;
 
                     const card = document.createElement("div");
-                    card.className = "service-card" + (visIdx === selectedVisible ? " selected" : "");
+                    var isSelected = visIdx === selectedVisible;
+                    card.className = "service-card" + (isSelected ? " selected" : "");
+                    if (isSelected) card.style.setProperty("--gutter-color", ICON_COLOR_HEX[g.colorClass] || "#6c63ff");
                     card.dataset.index = idx;
                     card.dataset.visibleIndex = visIdx;
+                    card.dataset.gutterColor = ICON_COLOR_HEX[g.colorClass] || "#6c63ff";
                     card.innerHTML = `
                         <div class="service-icon ${g.colorClass}">${g.iconText}</div>
                         <div class="service-info">
@@ -1050,8 +1060,14 @@
     function updateTimerBar() {
         const now = Math.floor(Date.now() / 1000);
         const remaining = 30 - (now % 30);
-        const pct = (remaining / 30) * 100;
-        timerBar.style.width = pct + "%";
+        var targetPct = ((remaining - 1) / 30) * 100;
+        if (remaining === 30) {
+            timerBar.style.transition = "none";
+            timerBar.style.width = "100%";
+            timerBar.offsetWidth;
+            timerBar.style.transition = "width 1s linear";
+        }
+        timerBar.style.width = targetPct + "%";
     }
 
     function escapeHtml(str) {
@@ -1274,7 +1290,11 @@
     function updateSelection(newIdx) {
         selectedVisible = newIdx;
         var cards = serviceList.querySelectorAll(".service-card");
-        cards.forEach((c, i) => c.classList.toggle("selected", i === selectedVisible));
+        cards.forEach((c, i) => {
+            var sel = i === selectedVisible;
+            c.classList.toggle("selected", sel);
+            if (sel) c.style.setProperty("--gutter-color", c.dataset.gutterColor || "#6c63ff");
+        });
         if (cards[selectedVisible]) {
             cards[selectedVisible].scrollIntoView({ block: "nearest" });
         }
