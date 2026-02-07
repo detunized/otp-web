@@ -273,6 +273,11 @@
             font-weight: 600;
             color: #fff;
             letter-spacing: 0.15em;
+            transition: color 0.3s;
+        }
+
+        .codes-expiring .service-code {
+            color: #ff6b6b;
         }
 
 
@@ -1068,6 +1073,7 @@
             timerBar.style.transition = "width 1s linear";
         }
         timerBar.style.width = targetPct + "%";
+        serviceList.classList.toggle("codes-expiring", remaining <= 5);
     }
 
     function escapeHtml(str) {
