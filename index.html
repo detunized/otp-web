@@ -154,7 +154,6 @@
             display: flex;
             align-items: center;
             gap: 0.4rem;
-            padding-bottom: 0.7rem;
             flex-wrap: wrap;
         }
 
@@ -556,11 +555,11 @@
     <div class="sticky-header" id="stickyHeader">
         <div class="codes-header">
             <h1>OTP Codes</h1>
-        </div>
-        <div class="toolbar">
-            <button class="toolbar-btn" id="addBtn">+ Add</button>
-            <button class="toolbar-btn" id="resetBtn">Import</button>
-            <button class="toolbar-btn danger-outline" id="eraseAllBtn">Erase All</button>
+            <div class="toolbar">
+                <button class="toolbar-btn" id="addBtn">+ Add</button>
+                <button class="toolbar-btn" id="resetBtn">Import</button>
+                <button class="toolbar-btn danger-outline" id="eraseAllBtn">Erase All</button>
+            </div>
         </div>
         <div class="filter-wrap" id="filterWrap">
             <input type="text" class="filter-input" id="filterInput" placeholder="Filter..." spellcheck="false" autocomplete="off">
