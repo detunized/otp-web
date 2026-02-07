@@ -178,17 +178,26 @@
             transition: width 1s linear;
         }
 
+        .service-group {
+            border-left: 3px solid #6c63ff;
+            border-radius: 3px 0 0 3px;
+            margin-bottom: 0.6rem;
+        }
+
         .service-card {
             background: #16213e;
-            border-radius: 10px;
+            border-radius: 0 10px 10px 0;
             padding: 1rem 1.2rem;
-            margin-bottom: 0.6rem;
             display: flex;
             align-items: center;
             gap: 1rem;
             cursor: pointer;
             transition: background 0.15s;
             position: relative;
+        }
+
+        .service-card + .service-card {
+            margin-top: 2px;
         }
 
         .service-card:hover {
@@ -918,17 +927,27 @@
         serviceList.innerHTML = "";
         visibleIndices = getSortedIndices();
         if (selectedVisible >= visibleIndices.length) selectedVisible = visibleIndices.length - 1;
+        let currentGroup = null;
+        let groupEl = null;
         visibleIndices.forEach((idx, visIdx) => {
             const entry = services[idx];
             const { serviceName, accountName } = parseServiceInfo(entry);
             const iconText = serviceIconText(serviceName);
             const colorClass = serviceIconColor(serviceName);
+            const groupKey = serviceName.toLowerCase();
+
+            if (groupKey !== currentGroup) {
+                currentGroup = groupKey;
+                groupEl = document.createElement("div");
+                groupEl.className = "service-group";
+                groupEl.style.borderLeftColor = ICON_COLOR_HEX[colorClass] || "#6c63ff";
+                serviceList.appendChild(groupEl);
+            }
 
             const card = document.createElement("div");
             card.className = "service-card" + (visIdx === selectedVisible ? " selected" : "");
             card.dataset.index = idx;
             card.dataset.visibleIndex = visIdx;
-            card.style.borderLeft = "3px solid " + (ICON_COLOR_HEX[colorClass] || "#6c63ff");
             card.innerHTML = `
                 <div class="service-icon ${colorClass}">${iconText}</div>
                 <div class="service-info">
@@ -971,7 +990,7 @@
                 }
             });
 
-            serviceList.appendChild(card);
+            groupEl.appendChild(card);
         });
     }
 
