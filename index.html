@@ -161,27 +161,6 @@
             color: #ff6b6b;
         }
 
-        .toolbar-btn.active {
-            background: #6c63ff;
-            border-color: #6c63ff;
-            color: #fff;
-        }
-
-        .toolbar-spacer {
-            flex: 1;
-        }
-
-        .sort-group {
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-        }
-
-        .sort-label {
-            font-size: 0.75rem;
-            color: #666;
-            margin-right: 0.2rem;
-        }
 
         .timer-bar-container {
             width: 100%;
@@ -553,13 +532,6 @@
         <button class="toolbar-btn" id="addBtn">+ Add</button>
         <button class="toolbar-btn" id="resetBtn">Import</button>
         <button class="toolbar-btn danger-outline" id="eraseAllBtn">Erase All</button>
-        <div class="toolbar-spacer"></div>
-        <div class="sort-group">
-            <span class="sort-label">Sort:</span>
-            <button class="toolbar-btn active" data-sort="original">Original</button>
-            <button class="toolbar-btn" data-sort="service">Service</button>
-            <button class="toolbar-btn" data-sort="account">Account</button>
-        </div>
     </div>
     <div class="filter-wrap" id="filterWrap">
         <input type="text" class="filter-input" id="filterInput" placeholder="Filter..." spellcheck="false" autocomplete="off">
@@ -743,6 +715,12 @@
         "icon-default"
     ];
 
+    var ICON_COLOR_HEX = {
+        "icon-green": "#2d8a4e", "icon-yellow": "#b8860b", "icon-red": "#c0392b",
+        "icon-orange": "#d35400", "icon-pink": "#c0457b", "icon-indigo": "#5c6bc0",
+        "icon-turquoise": "#1abc9c", "icon-lightblue": "#2980b9", "icon-default": "#6c63ff"
+    };
+
     function serviceIconColor(serviceName) {
         var key = serviceName.toLowerCase().trim();
         var hash = 0;
@@ -796,7 +774,6 @@
     let updateTimer = null;
     let pendingDeleteIndex = -1;
     let pendingEditIndex = -1; // -1 = none, -2 = adding new
-    let currentSort = "original";
     let filterText = "";
     let selectedVisible = -1; // index into the visible (sorted+filtered) list
     let visibleIndices = []; // current visible service indices
@@ -837,7 +814,6 @@
     const eraseAllModal = document.getElementById("eraseAllModal");
     const eraseAllCancelBtn = document.getElementById("eraseAllCancelBtn");
     const eraseAllConfirmBtn = document.getElementById("eraseAllConfirmBtn");
-    const sortButtons = document.querySelectorAll("[data-sort]");
 
     // Drop zone events
     dropZone.addEventListener("click", () => fileInput.click());
@@ -930,19 +906,11 @@
                 return serviceName.toLowerCase().includes(q) || accountName.toLowerCase().includes(q);
             });
         }
-        if (currentSort === "service") {
-            indices.sort((a, b) => {
-                const sa = parseServiceInfo(services[a]).serviceName.toLowerCase();
-                const sb = parseServiceInfo(services[b]).serviceName.toLowerCase();
-                return sa.localeCompare(sb);
-            });
-        } else if (currentSort === "account") {
-            indices.sort((a, b) => {
-                const aa = parseServiceInfo(services[a]).accountName.toLowerCase();
-                const ab = parseServiceInfo(services[b]).accountName.toLowerCase();
-                return aa.localeCompare(ab);
-            });
-        }
+        indices.sort((a, b) => {
+            const sa = parseServiceInfo(services[a]).serviceName.toLowerCase();
+            const sb = parseServiceInfo(services[b]).serviceName.toLowerCase();
+            return sa.localeCompare(sb);
+        });
         return indices;
     }
 
@@ -960,6 +928,7 @@
             card.className = "service-card" + (visIdx === selectedVisible ? " selected" : "");
             card.dataset.index = idx;
             card.dataset.visibleIndex = visIdx;
+            card.style.borderLeft = "3px solid " + (ICON_COLOR_HEX[colorClass] || "#6c63ff");
             card.innerHTML = `
                 <div class="service-icon ${colorClass}">${iconText}</div>
                 <div class="service-info">
@@ -1170,16 +1139,6 @@
         filterInput.focus();
     });
 
-    // Sort buttons
-    sortButtons.forEach(btn => {
-        btn.addEventListener("click", () => {
-            currentSort = btn.dataset.sort;
-            sortButtons.forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            renderServiceList();
-            updateAllCodes();
-        });
-    });
 
     // Erase all
     eraseAllBtn.addEventListener("click", () => {
