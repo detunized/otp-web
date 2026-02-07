@@ -833,6 +833,7 @@
     let selectedVisible = -1; // index into the visible (sorted+filtered) list
     let visibleIndices = []; // current visible service indices
     let collapsedGroups = new Set();
+    let currentGroups = []; // groups from last render
 
     // DOM
     const importView = document.getElementById("importView");
@@ -993,6 +994,8 @@
             }
             groups[groups.length - 1].indices.push(idx);
         });
+
+        currentGroups = groups;
 
         // Rebuild visibleIndices (only non-collapsed entries)
         visibleIndices = [];
@@ -1373,6 +1376,81 @@
         }
     }
 
+    // When navigating past the edge of visible entries, find and expand the next collapsed group
+    function expandCollapsedGroupAt(currentSel, direction) {
+        if (currentGroups.length === 0) return false;
+
+        // Build a flat list of group segments with their visible position ranges
+        var segments = [];
+        var pos = 0;
+        currentGroups.forEach(g => {
+            var collapsed = collapsedGroups.has(g.key) && g.indices.length > 1;
+            segments.push({ group: g, collapsed: collapsed, startPos: pos, count: collapsed ? 0 : g.indices.length });
+            if (!collapsed) pos += g.indices.length;
+        });
+
+        if (direction === 1) {
+            // Moving down: check if at end of visible entries or at the boundary before a collapsed group
+            var nextPos = currentSel + 1;
+            // Find which segment the current position belongs to
+            for (var i = 0; i < segments.length; i++) {
+                var seg = segments[i];
+                if (seg.collapsed) continue;
+                if (currentSel >= seg.startPos && currentSel < seg.startPos + seg.count) {
+                    // Current position is in this segment
+                    if (nextPos >= seg.startPos + seg.count) {
+                        // Moving past this segment, find next collapsed group
+                        for (var j = i + 1; j < segments.length; j++) {
+                            if (segments[j].collapsed) {
+                                collapsedGroups.delete(segments[j].group.key);
+                                selectedVisible = nextPos;
+                                renderServiceList();
+                                updateAllCodes();
+                                updateSelection(selectedVisible);
+                                return true;
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+        } else {
+            // Moving up: check if at boundary above a collapsed group
+            var prevPos = currentSel - 1;
+            for (var i = 0; i < segments.length; i++) {
+                var seg = segments[i];
+                if (seg.collapsed) continue;
+                if (currentSel >= seg.startPos && currentSel < seg.startPos + seg.count) {
+                    if (prevPos < seg.startPos) {
+                        // Moving before this segment, find previous collapsed group
+                        for (var j = i - 1; j >= 0; j--) {
+                            if (segments[j].collapsed) {
+                                collapsedGroups.delete(segments[j].group.key);
+                                // Select last entry of the newly expanded group
+                                selectedVisible = seg.startPos - 1 + segments[j].group.indices.length;
+                                renderServiceList();
+                                updateAllCodes();
+                                updateSelection(selectedVisible);
+                                return true;
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            // Handle case where nothing is selected yet (selectedVisible = -1) and pressing up
+            if (currentSel < 0 && segments.length > 0 && segments[segments.length - 1].collapsed) {
+                collapsedGroups.delete(segments[segments.length - 1].group.key);
+                renderServiceList();
+                updateAllCodes();
+                return false; // let normal handler pick up
+            }
+        }
+        return false;
+    }
+
     function isModalOpen() {
         return deleteModal.classList.contains("active")
             || editModal.classList.contains("active")
@@ -1405,6 +1483,7 @@
 
         if (e.key === "ArrowDown") {
             e.preventDefault();
+            if (expandCollapsedGroupAt(selectedVisible, 1)) return;
             if (visibleIndices.length === 0) return;
             updateSelection(Math.min(selectedVisible + 1, visibleIndices.length - 1));
             return;
@@ -1412,6 +1491,7 @@
 
         if (e.key === "ArrowUp") {
             e.preventDefault();
+            if (expandCollapsedGroupAt(selectedVisible, -1)) return;
             if (visibleIndices.length === 0) return;
             updateSelection(Math.max(selectedVisible - 1, 0));
             return;
