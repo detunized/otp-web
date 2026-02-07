@@ -204,6 +204,7 @@
             cursor: pointer;
             transition: background 0.15s;
             position: relative;
+            scroll-margin-top: 8rem;
         }
 
         .service-card + .service-card {
@@ -280,6 +281,21 @@
             color: #ff6b6b;
         }
 
+        .codes-footer {
+            text-align: center;
+            padding: 2rem 0 3rem;
+            font-size: 0.7rem;
+            color: #333;
+        }
+
+        .codes-footer a {
+            color: #444;
+            text-decoration: none;
+        }
+
+        .codes-footer a:hover {
+            color: #666;
+        }
 
         .copied-toast {
             position: fixed;
@@ -576,6 +592,9 @@
         </div>
     </div>
     <div id="serviceList"></div>
+    <div class="codes-footer">
+        <a href="https://github.com/detunized/otp-web" target="_blank" rel="noopener">otp-web</a> &copy; 2026
+    </div>
 </div>
 
 <div class="copied-toast" id="copiedToast">Code copied</div>
