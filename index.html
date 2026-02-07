@@ -119,6 +119,25 @@
             margin: 0 auto;
         }
 
+        /* Sticky header container */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: #1a1a2e;
+            padding-top: 1rem;
+            padding-bottom: 0.5rem;
+            margin: -1rem -1rem 0 -1rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            box-shadow: 0 0 0 0 transparent;
+            transition: box-shadow 0.2s;
+        }
+
+        .sticky-header.stuck {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
         .codes-header {
             display: flex;
             align-items: center;
@@ -167,7 +186,6 @@
             height: 3px;
             background: #333;
             border-radius: 2px;
-            margin-bottom: 1rem;
             overflow: hidden;
         }
 
@@ -580,21 +598,23 @@
 </div>
 
 <div class="codes-view" id="codesView">
-    <div class="codes-header">
-        <h1>OTP Codes</h1>
-    </div>
-    <div class="toolbar">
-        <button class="toolbar-btn" id="addBtn">+ Add</button>
-        <button class="toolbar-btn" id="resetBtn">Import</button>
-        <button class="toolbar-btn" id="collapseAllBtn">Collapse All</button>
-        <button class="toolbar-btn danger-outline" id="eraseAllBtn">Erase All</button>
-    </div>
-    <div class="filter-wrap" id="filterWrap">
-        <input type="text" class="filter-input" id="filterInput" placeholder="Filter..." spellcheck="false" autocomplete="off">
-        <button class="filter-clear" id="filterClear">&times;</button>
-    </div>
-    <div class="timer-bar-container">
-        <div class="timer-bar" id="timerBar"></div>
+    <div class="sticky-header" id="stickyHeader">
+        <div class="codes-header">
+            <h1>OTP Codes</h1>
+        </div>
+        <div class="toolbar">
+            <button class="toolbar-btn" id="addBtn">+ Add</button>
+            <button class="toolbar-btn" id="resetBtn">Import</button>
+            <button class="toolbar-btn" id="collapseAllBtn">Collapse All</button>
+            <button class="toolbar-btn danger-outline" id="eraseAllBtn">Erase All</button>
+        </div>
+        <div class="filter-wrap" id="filterWrap">
+            <input type="text" class="filter-input" id="filterInput" placeholder="Filter..." spellcheck="false" autocomplete="off">
+            <button class="filter-clear" id="filterClear">&times;</button>
+        </div>
+        <div class="timer-bar-container">
+            <div class="timer-bar" id="timerBar"></div>
+        </div>
     </div>
     <div id="serviceList"></div>
 </div>
@@ -656,6 +676,21 @@
 <script>
 (function() {
     "use strict";
+
+    // Sticky header shadow on scroll
+    (function initStickyHeader() {
+        const stickyHeader = document.getElementById("stickyHeader");
+        if (!stickyHeader) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                stickyHeader.classList.toggle("stuck", entry.intersectionRatio < 1);
+            },
+            { threshold: [1], rootMargin: "-1px 0px 0px 0px" }
+        );
+
+        observer.observe(stickyHeader);
+    })();
 
     // Base32 decode
     function base32Decode(input) {
