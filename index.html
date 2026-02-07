@@ -182,6 +182,51 @@
             border-left: 3px solid #6c63ff;
             border-radius: 3px 0 0 3px;
             margin-bottom: 0.6rem;
+            position: relative;
+        }
+
+        .service-group .group-gutter {
+            position: absolute;
+            left: -3px;
+            top: 0;
+            bottom: 0;
+            width: 14px;
+            cursor: pointer;
+            z-index: 1;
+        }
+
+        .group-header {
+            background: #16213e;
+            border-radius: 0 10px 10px 0;
+            padding: 0.7rem 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .group-header:hover {
+            background: #1a2745;
+        }
+
+        .group-header .group-chevron {
+            color: #555;
+            font-size: 0.7rem;
+            flex-shrink: 0;
+            transition: transform 0.15s;
+        }
+
+        .group-header .group-label {
+            font-size: 0.85rem;
+            color: #aaa;
+            font-weight: 500;
+        }
+
+        .group-header .group-count {
+            font-size: 0.75rem;
+            color: #555;
+            margin-left: auto;
         }
 
         .service-card {
@@ -540,6 +585,7 @@
     <div class="toolbar">
         <button class="toolbar-btn" id="addBtn">+ Add</button>
         <button class="toolbar-btn" id="resetBtn">Import</button>
+        <button class="toolbar-btn" id="collapseAllBtn">Collapse All</button>
         <button class="toolbar-btn danger-outline" id="eraseAllBtn">Erase All</button>
     </div>
     <div class="filter-wrap" id="filterWrap">
@@ -786,6 +832,7 @@
     let filterText = "";
     let selectedVisible = -1; // index into the visible (sorted+filtered) list
     let visibleIndices = []; // current visible service indices
+    let collapsedGroups = new Set();
 
     // DOM
     const importView = document.getElementById("importView");
@@ -800,6 +847,7 @@
     const resetBtn = document.getElementById("resetBtn");
     const addBtn = document.getElementById("addBtn");
     const eraseAllBtn = document.getElementById("eraseAllBtn");
+    const collapseAllBtn = document.getElementById("collapseAllBtn");
     const filterInput = document.getElementById("filterInput");
     const filterWrap = document.getElementById("filterWrap");
     const filterClear = document.getElementById("filterClear");
@@ -925,73 +973,132 @@
 
     function renderServiceList() {
         serviceList.innerHTML = "";
-        visibleIndices = getSortedIndices();
-        if (selectedVisible >= visibleIndices.length) selectedVisible = visibleIndices.length - 1;
-        let currentGroup = null;
-        let groupEl = null;
-        visibleIndices.forEach((idx, visIdx) => {
-            const entry = services[idx];
-            const { serviceName, accountName } = parseServiceInfo(entry);
-            const iconText = serviceIconText(serviceName);
-            const colorClass = serviceIconColor(serviceName);
+        var allIndices = getSortedIndices();
+
+        // Build groups: array of { key, serviceName, colorClass, iconText, indices[] }
+        var groups = [];
+        var lastKey = null;
+        allIndices.forEach(idx => {
+            const { serviceName } = parseServiceInfo(services[idx]);
             const groupKey = serviceName.toLowerCase();
-
-            if (groupKey !== currentGroup) {
-                currentGroup = groupKey;
-                groupEl = document.createElement("div");
-                groupEl.className = "service-group";
-                groupEl.style.borderLeftColor = ICON_COLOR_HEX[colorClass] || "#6c63ff";
-                serviceList.appendChild(groupEl);
+            if (groupKey !== lastKey) {
+                lastKey = groupKey;
+                groups.push({
+                    key: groupKey,
+                    serviceName: serviceName,
+                    colorClass: serviceIconColor(serviceName),
+                    iconText: serviceIconText(serviceName),
+                    indices: []
+                });
             }
-
-            const card = document.createElement("div");
-            card.className = "service-card" + (visIdx === selectedVisible ? " selected" : "");
-            card.dataset.index = idx;
-            card.dataset.visibleIndex = visIdx;
-            card.innerHTML = `
-                <div class="service-icon ${colorClass}">${iconText}</div>
-                <div class="service-info">
-                    <div class="service-name">${escapeHtml(serviceName)}</div>
-                    <div class="service-account">${escapeHtml(accountName)}</div>
-                </div>
-                <div class="service-code-area">
-                    <div class="service-code" id="code-${idx}">------</div>
-                </div>
-                <div class="card-actions">
-                    <button class="card-action-btn qr-btn" data-idx="${idx}" title="QR Code" style="font-size:0.7rem;font-weight:700">QR</button>
-                    <button class="card-action-btn edit-btn" data-idx="${idx}" title="Edit">&#9998;</button>
-                    <button class="card-action-btn delete-btn" data-idx="${idx}" title="Delete">&times;</button>
-                </div>
-            `;
-
-            card.querySelector(".qr-btn").addEventListener("click", e => {
-                e.stopPropagation();
-                openQrModal(idx);
-            });
-
-            card.querySelector(".edit-btn").addEventListener("click", e => {
-                e.stopPropagation();
-                openEditModal(idx);
-            });
-
-            card.querySelector(".delete-btn").addEventListener("click", e => {
-                e.stopPropagation();
-                openDeleteModal(idx);
-            });
-
-            card.addEventListener("click", async () => {
-                const codeEl = document.getElementById(`code-${idx}`);
-                const rawCode = codeEl.textContent.replace(/\s/g, "");
-                try {
-                    await navigator.clipboard.writeText(rawCode);
-                    showToast("Code copied");
-                } catch {
-                    showToast("Copy failed");
-                }
-            });
-
-            groupEl.appendChild(card);
+            groups[groups.length - 1].indices.push(idx);
         });
+
+        // Rebuild visibleIndices (only non-collapsed entries)
+        visibleIndices = [];
+        groups.forEach(g => {
+            if (!collapsedGroups.has(g.key)) {
+                g.indices.forEach(idx => visibleIndices.push(idx));
+            }
+        });
+        if (selectedVisible >= visibleIndices.length) selectedVisible = visibleIndices.length - 1;
+
+        var visCounter = 0;
+        groups.forEach(g => {
+            const collapsed = collapsedGroups.has(g.key);
+            const groupEl = document.createElement("div");
+            groupEl.className = "service-group";
+            groupEl.style.borderLeftColor = ICON_COLOR_HEX[g.colorClass] || "#6c63ff";
+            serviceList.appendChild(groupEl);
+
+            // Clickable gutter area
+            const gutter = document.createElement("div");
+            gutter.className = "group-gutter";
+            gutter.addEventListener("click", () => {
+                toggleGroup(g.key);
+            });
+            groupEl.appendChild(gutter);
+
+            if (collapsed) {
+                // Show collapsed header
+                const header = document.createElement("div");
+                header.className = "group-header";
+                header.innerHTML = `
+                    <span class="group-chevron">&#9654;</span>
+                    <div class="service-icon ${g.colorClass}" style="width:28px;height:28px;border-radius:7px;font-size:0.65rem">${g.iconText}</div>
+                    <span class="group-label">${escapeHtml(g.serviceName)}</span>
+                    <span class="group-count">${g.indices.length}</span>
+                `;
+                header.addEventListener("click", () => toggleGroup(g.key));
+                groupEl.appendChild(header);
+            } else {
+                g.indices.forEach(idx => {
+                    const entry = services[idx];
+                    const { serviceName, accountName } = parseServiceInfo(entry);
+                    const visIdx = visCounter++;
+
+                    const card = document.createElement("div");
+                    card.className = "service-card" + (visIdx === selectedVisible ? " selected" : "");
+                    card.dataset.index = idx;
+                    card.dataset.visibleIndex = visIdx;
+                    card.innerHTML = `
+                        <div class="service-icon ${g.colorClass}">${g.iconText}</div>
+                        <div class="service-info">
+                            <div class="service-name">${escapeHtml(serviceName)}</div>
+                            <div class="service-account">${escapeHtml(accountName)}</div>
+                        </div>
+                        <div class="service-code-area">
+                            <div class="service-code" id="code-${idx}">------</div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="card-action-btn qr-btn" data-idx="${idx}" title="QR Code" style="font-size:0.7rem;font-weight:700">QR</button>
+                            <button class="card-action-btn edit-btn" data-idx="${idx}" title="Edit">&#9998;</button>
+                            <button class="card-action-btn delete-btn" data-idx="${idx}" title="Delete">&times;</button>
+                        </div>
+                    `;
+
+                    card.querySelector(".qr-btn").addEventListener("click", e => {
+                        e.stopPropagation();
+                        openQrModal(idx);
+                    });
+
+                    card.querySelector(".edit-btn").addEventListener("click", e => {
+                        e.stopPropagation();
+                        openEditModal(idx);
+                    });
+
+                    card.querySelector(".delete-btn").addEventListener("click", e => {
+                        e.stopPropagation();
+                        openDeleteModal(idx);
+                    });
+
+                    card.addEventListener("click", async () => {
+                        const codeEl = document.getElementById(`code-${idx}`);
+                        const rawCode = codeEl.textContent.replace(/\s/g, "");
+                        try {
+                            await navigator.clipboard.writeText(rawCode);
+                            showToast("Code copied");
+                        } catch {
+                            showToast("Copy failed");
+                        }
+                    });
+
+                    groupEl.appendChild(card);
+                });
+            }
+        });
+
+        // Update collapse button label
+        var allGroupKeys = groups.map(g => g.key);
+        var allCollapsed = allGroupKeys.length > 0 && allGroupKeys.every(k => collapsedGroups.has(k));
+        collapseAllBtn.textContent = allCollapsed ? "Expand All" : "Collapse All";
+    }
+
+    function toggleGroup(key) {
+        if (collapsedGroups.has(key)) collapsedGroups.delete(key);
+        else collapsedGroups.add(key);
+        renderServiceList();
+        updateAllCodes();
     }
 
     async function updateAllCodes() {
@@ -1158,6 +1265,23 @@
         filterInput.focus();
     });
 
+
+    // Collapse all
+    collapseAllBtn.addEventListener("click", () => {
+        var allIndices = getSortedIndices();
+        var allKeys = new Set();
+        allIndices.forEach(idx => {
+            allKeys.add(parseServiceInfo(services[idx]).serviceName.toLowerCase());
+        });
+        var allCollapsed = allKeys.size > 0 && [...allKeys].every(k => collapsedGroups.has(k));
+        if (allCollapsed) {
+            collapsedGroups.clear();
+        } else {
+            allKeys.forEach(k => collapsedGroups.add(k));
+        }
+        renderServiceList();
+        updateAllCodes();
+    });
 
     // Erase all
     eraseAllBtn.addEventListener("click", () => {
