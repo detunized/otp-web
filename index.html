@@ -550,6 +550,96 @@
             image-rendering: pixelated;
         }
 
+        .drive-import-divider {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            max-width: 600px;
+            margin: 1.5rem 0;
+            gap: 1rem;
+        }
+
+        .drive-import-divider::before,
+        .drive-import-divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: #333;
+        }
+
+        .drive-import-divider span {
+            color: #555;
+            font-size: 0.85rem;
+        }
+
+        .drive-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.7rem 1.5rem;
+            background: #16213e;
+            color: #ccc;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s, color 0.2s;
+        }
+
+        .drive-btn:hover:not(:disabled) {
+            border-color: #888;
+            background: #1a2745;
+            color: #fff;
+        }
+
+        .drive-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .drive-btn svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .drive-toolbar-btn {
+            padding: 0.4rem;
+            background: transparent;
+            color: #888;
+            border: 1px solid #444;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .drive-toolbar-btn:hover:not(:disabled) {
+            border-color: #888;
+            color: #e0e0e0;
+        }
+
+        .drive-toolbar-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .drive-toolbar-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        @keyframes drive-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .drive-toolbar-btn.loading svg,
+        .drive-btn.loading svg {
+            animation: drive-spin 1s linear infinite;
+        }
+
     </style>
 </head>
 <body>
@@ -571,6 +661,12 @@
     </div>
 
     <div class="error-msg" id="errorMsg"></div>
+
+    <div class="drive-import-divider"><span>or</span></div>
+    <button class="drive-btn" id="driveLoadBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        Load from Google Drive
+    </button>
 </div>
 
 <div class="codes-view" id="codesView">
@@ -580,6 +676,9 @@
             <div class="toolbar">
                 <button class="toolbar-btn" id="addBtn">+ Add</button>
                 <button class="toolbar-btn" id="resetBtn">Import</button>
+                <button class="drive-toolbar-btn" id="driveSaveBtn" title="Save to Google Drive" disabled>
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+                </button>
                 <button class="toolbar-btn danger-outline" id="eraseAllBtn">Erase All</button>
             </div>
         </div>
@@ -650,10 +749,159 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="driveReplaceModal">
+    <div class="modal">
+        <h2>Replace local data?</h2>
+        <p id="driveReplaceText">Replace current data with Google Drive backup? This will overwrite your current entries.</p>
+        <div class="modal-actions">
+            <button class="modal-btn cancel" id="driveReplaceCancelBtn">Cancel</button>
+            <button class="modal-btn primary" id="driveReplaceConfirmBtn">Replace</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://apis.google.com/js/api.js" onload="__gapiLoaded()" async defer></script>
+<script src="https://accounts.google.com/gsi/client" onload="__gisLoaded()" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 (function() {
     "use strict";
+
+    // Google Drive integration
+    var DRIVE_CLIENT_ID = "YOUR_CLIENT_ID_HERE"; // Replace with your OAuth Client ID
+    var DRIVE_FILE_NAME = "otp-web.json";
+    var DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+    var gapiReady = false;
+    var gisReady = false;
+    var tokenClient = null;
+    var driveFileId = null;
+
+    window.__gapiLoaded = function() {
+        gapi.load("client", function() {
+            gapi.client.init({}).then(function() {
+                gapi.client.load("https://www.googleapis.com/discovery/v1/apis/drive/v3/rest").then(function() {
+                    gapiReady = true;
+                    enableDriveButtons();
+                });
+            });
+        });
+    };
+
+    window.__gisLoaded = function() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: DRIVE_CLIENT_ID,
+            scope: DRIVE_SCOPE,
+            callback: "",
+        });
+        gisReady = true;
+        enableDriveButtons();
+    };
+
+    function enableDriveButtons() {
+        if (!gapiReady || !gisReady) return;
+        var loadBtn = document.getElementById("driveLoadBtn");
+        var saveBtn = document.getElementById("driveSaveBtn");
+        if (loadBtn) loadBtn.disabled = false;
+        if (saveBtn) saveBtn.disabled = false;
+    }
+
+    function withDriveAuth(callback) {
+        if (!gapiReady || !gisReady) {
+            showToast("Google Drive not available");
+            return;
+        }
+        tokenClient.callback = function(resp) {
+            if (resp.error) {
+                if (resp.error === "popup_blocked_by_browser") {
+                    showToast("Please allow popups");
+                } else {
+                    showToast("Sign-in failed");
+                }
+                return;
+            }
+            callback();
+        };
+        if (gapi.client.getToken() === null) {
+            tokenClient.requestAccessToken({ prompt: "consent" });
+        } else {
+            callback();
+        }
+    }
+
+    function findDriveFile() {
+        return gapi.client.drive.files.list({
+            q: "name='" + DRIVE_FILE_NAME + "' and trashed=false",
+            spaces: "drive",
+            fields: "files(id, name)",
+            pageSize: 1
+        }).then(function(resp) {
+            var files = resp.result.files;
+            if (files && files.length > 0) {
+                driveFileId = files[0].id;
+                return driveFileId;
+            }
+            return null;
+        });
+    }
+
+    function readDriveFile(fileId) {
+        return gapi.client.drive.files.get({
+            fileId: fileId,
+            alt: "media"
+        }).then(function(resp) {
+            return resp.result;
+        });
+    }
+
+    function createDriveFile(content) {
+        var boundary = "---drive-boundary-" + Date.now();
+        var metadata = {
+            name: DRIVE_FILE_NAME,
+            mimeType: "application/json"
+        };
+        var body =
+            "--" + boundary + "\r\n" +
+            "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+            JSON.stringify(metadata) + "\r\n" +
+            "--" + boundary + "\r\n" +
+            "Content-Type: application/json\r\n\r\n" +
+            JSON.stringify(content) + "\r\n" +
+            "--" + boundary + "--";
+
+        return fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+            method: "POST",
+            headers: {
+                "Authorization": "Bearer " + gapi.client.getToken().access_token,
+                "Content-Type": "multipart/related; boundary=" + boundary
+            },
+            body: body
+        }).then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            driveFileId = data.id;
+            return data;
+        });
+    }
+
+    function updateDriveFile(fileId, content) {
+        return fetch("https://www.googleapis.com/upload/drive/v3/files/" + fileId + "?uploadType=media", {
+            method: "PATCH",
+            headers: {
+                "Authorization": "Bearer " + gapi.client.getToken().access_token,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(content)
+        }).then(function(resp) {
+            if (resp.status === 401) {
+                // Token expired, re-auth and retry
+                return new Promise(function(resolve, reject) {
+                    withDriveAuth(function() {
+                        updateDriveFile(fileId, content).then(resolve, reject);
+                    });
+                });
+            }
+            return resp.json();
+        });
+    }
 
     // Base32 decode
     function base32Decode(input) {
@@ -868,6 +1116,12 @@
     const eraseAllModal = document.getElementById("eraseAllModal");
     const eraseAllCancelBtn = document.getElementById("eraseAllCancelBtn");
     const eraseAllConfirmBtn = document.getElementById("eraseAllConfirmBtn");
+    const driveLoadBtn = document.getElementById("driveLoadBtn");
+    const driveSaveBtn = document.getElementById("driveSaveBtn");
+    const driveReplaceModal = document.getElementById("driveReplaceModal");
+    const driveReplaceText = document.getElementById("driveReplaceText");
+    const driveReplaceCancelBtn = document.getElementById("driveReplaceCancelBtn");
+    const driveReplaceConfirmBtn = document.getElementById("driveReplaceConfirmBtn");
 
     // Drop zone events
     dropZone.addEventListener("click", () => fileInput.click());
@@ -1329,7 +1583,8 @@
         return deleteModal.classList.contains("active")
             || editModal.classList.contains("active")
             || eraseAllModal.classList.contains("active")
-            || qrModal.classList.contains("active");
+            || qrModal.classList.contains("active")
+            || driveReplaceModal.classList.contains("active");
     }
 
     document.addEventListener("keydown", e => {
@@ -1338,6 +1593,7 @@
             else if (deleteModal.classList.contains("active")) closeDeleteModal();
             else if (editModal.classList.contains("active")) closeEditModal();
             else if (eraseAllModal.classList.contains("active")) eraseAllModal.classList.remove("active");
+            else if (driveReplaceModal.classList.contains("active")) driveReplaceModal.classList.remove("active");
             e.preventDefault();
             return;
         }
@@ -1389,6 +1645,95 @@
                 filterInput.focus();
             }
         }
+    });
+
+    // Google Drive save/load
+    function setDriveBtnLoading(btn, loading) {
+        btn.classList.toggle("loading", loading);
+        btn.disabled = loading;
+    }
+
+    function saveToDrive() {
+        withDriveAuth(function() {
+            setDriveBtnLoading(driveSaveBtn, true);
+            var data = { services: services };
+            findDriveFile().then(function(fileId) {
+                if (fileId) {
+                    return updateDriveFile(fileId, data);
+                } else {
+                    return createDriveFile(data);
+                }
+            }).then(function() {
+                showToast("Saved to Google Drive");
+            }).catch(function(err) {
+                console.error("Drive save error:", err);
+                showToast("Drive save failed");
+            }).finally(function() {
+                setDriveBtnLoading(driveSaveBtn, false);
+            });
+        });
+    }
+
+    var pendingDriveData = null;
+
+    function loadFromDrive() {
+        withDriveAuth(function() {
+            setDriveBtnLoading(driveLoadBtn, true);
+            findDriveFile().then(function(fileId) {
+                if (!fileId) {
+                    showToast("No backup found on Drive");
+                    return null;
+                }
+                return readDriveFile(fileId);
+            }).then(function(data) {
+                if (!data) return;
+                if (!data.services || !Array.isArray(data.services) || data.services.length === 0) {
+                    showToast("Backup file is empty or corrupt");
+                    return;
+                }
+                pendingDriveData = data.services;
+                if (services.length > 0) {
+                    driveReplaceText.textContent = "Replace current " + services.length + " entries with " + pendingDriveData.length + " entries from Google Drive?";
+                    driveReplaceModal.classList.add("active");
+                } else {
+                    applyDriveData();
+                }
+            }).catch(function(err) {
+                console.error("Drive load error:", err);
+                showToast("Drive load failed");
+            }).finally(function() {
+                setDriveBtnLoading(driveLoadBtn, false);
+            });
+        });
+    }
+
+    function applyDriveData() {
+        if (!pendingDriveData) return;
+        services = pendingDriveData;
+        pendingDriveData = null;
+        saveToStorage();
+        showCodes();
+        showToast("Loaded from Google Drive");
+    }
+
+    driveSaveBtn.addEventListener("click", saveToDrive);
+    driveLoadBtn.addEventListener("click", loadFromDrive);
+
+    driveReplaceCancelBtn.addEventListener("click", function() {
+        pendingDriveData = null;
+        driveReplaceModal.classList.remove("active");
+    });
+
+    driveReplaceModal.addEventListener("click", function(e) {
+        if (e.target === driveReplaceModal) {
+            pendingDriveData = null;
+            driveReplaceModal.classList.remove("active");
+        }
+    });
+
+    driveReplaceConfirmBtn.addEventListener("click", function() {
+        driveReplaceModal.classList.remove("active");
+        applyDriveData();
     });
 })();
 </script>
