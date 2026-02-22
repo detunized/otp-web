@@ -651,6 +651,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
 (function() {
     "use strict";
@@ -1298,6 +1299,89 @@
 
     qrModal.addEventListener("click", e => {
         if (e.target === qrModal) qrModal.classList.remove("active");
+    });
+
+    // Parse otpauth:// URI into a service entry
+    function parseOtpauthUri(uri) {
+        const url = new URL(uri);
+        if (url.protocol !== "otpauth:") throw new Error("Not an otpauth URI");
+        const type = url.hostname;
+        if (type !== "totp") throw new Error("Only TOTP is supported");
+
+        const label = decodeURIComponent(url.pathname.slice(1));
+        const params = url.searchParams;
+        const secret = params.get("secret");
+        if (!secret) throw new Error("Missing secret");
+
+        let issuer = params.get("issuer") || "";
+        let account = label;
+        const colonIdx = label.indexOf(":");
+        if (colonIdx !== -1) {
+            if (!issuer) issuer = label.slice(0, colonIdx).trim();
+            account = label.slice(colonIdx + 1).trim();
+        }
+
+        return {
+            name: account,
+            secret: secret.toUpperCase(),
+            otp: {
+                issuer: issuer,
+                account: account,
+                algorithm: params.get("algorithm") || "SHA1",
+                period: parseInt(params.get("period") || "30", 10),
+                digits: parseInt(params.get("digits") || "6", 10),
+                counter: 0,
+                tokenType: "TOTP"
+            }
+        };
+    }
+
+    // Handle pasted QR code images
+    document.addEventListener("paste", e => {
+        if (isModalOpen()) return;
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+
+        for (const item of items) {
+            if (item.type.startsWith("image/")) {
+                e.preventDefault();
+                const blob = item.getAsFile();
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, canvas.width, canvas.height);
+                    URL.revokeObjectURL(img.src);
+
+                    if (!code || !code.data) {
+                        showToast("No QR code found in image");
+                        return;
+                    }
+
+                    try {
+                        const entry = parseOtpauthUri(code.data);
+                        services.push(entry);
+                        saveToStorage();
+                        if (codesView.style.display === "none") {
+                            showCodes();
+                        } else {
+                            renderServiceList();
+                            updateAllCodes();
+                        }
+                        const { serviceName } = parseServiceInfo(entry);
+                        showToast("Added " + serviceName);
+                    } catch (err) {
+                        showToast("Invalid QR: " + err.message);
+                    }
+                };
+                img.src = URL.createObjectURL(blob);
+                return;
+            }
+        }
     });
 
     // Add new entry
